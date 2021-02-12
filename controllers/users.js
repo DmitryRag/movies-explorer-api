@@ -14,13 +14,16 @@ const {
 } = require('../constants');
 
 const getUser = (req, res, next) => {
-  const { id } = req.params;
-  User.findOne({ _id: id })
-    .then((user) => {
-      if (!user) {
-        throw new NotFoundError(userIdNotFoundErr);
+  User.findOne({ _id: req.user._id })
+    .orFail(new NotFoundError(userIdNotFoundErr))
+    .then((data) => {
+      res.send(data);
+    })
+    .catch((err) => {
+      if (err.name === 'CastError') {
+        throw new BadReqError(validationErr);
       }
-      return res.status(200).send(user);
+      throw err;
     })
     .catch(next);
 };
@@ -64,13 +67,21 @@ const updateUser = (req, res, next) => {
 
 const login = (req, res, next) => {
   const { email, password } = req.body;
-
-  return User.findUserByCredentials(email, password)
+  User.findOne({ email }).select('+password')
     .then((user) => {
-      const token = jwt.sign({ _id: user._id }, JWT_SECRET, { expiresIn: '7d' });
-      res.send({ token });
+      if (!user) {
+        throw new NotAuthError(wrongPassOrEmailErr);
+      }
+      return bcrypt.compare(password, user.password)
+        .then((matched) => {
+          if (!matched) {
+            throw new NotAuthError(wrongPassOrEmailErr);
+          }
+          const token = jwt.sign({ _id: user._id }, JWT_SECRET, { noTimestamp: true, expiresIn: '7d' });
+          return res.send({ token });
+        });
     })
-    .catch(() => next(new NotAuthError(wrongPassOrEmailErr)));
+    .catch(next);
 };
 
 module.exports = {
