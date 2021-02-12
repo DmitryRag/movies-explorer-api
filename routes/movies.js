@@ -8,4 +8,3 @@ moviesRouter.post('/movies', auth, postMovieValidation, createMovie);
 moviesRouter.delete('/movies/:movieId', auth, deleteMovieValidation, deleteMovie);
 
 module.exports = moviesRouter;
-
